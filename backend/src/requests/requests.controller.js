@@ -1,75 +1,283 @@
-import { db } from '../db.js';
-import { makeError } from '../utils/validate.js';
-import { createSchema, updateStatusSchema, scheduleSchema } from './requests.validators.js';
+import db from "../db/db.js";
+import Joi from "joi";
+import { makeError } from "../utils/errors.js";
 
+// ===============================================
+// 🔹 Validation Schemas
+// ===============================================
+
+const requestSchema = Joi.object({
+  customer_name: Joi.string().min(3).required(),
+  phone: Joi.string().pattern(/^[0-9]{10}$/).required(),
+  pickup_location: Joi.string().required(),
+  dropoff_location: Joi.string().required(),
+  pickup_time: Joi.date().iso().required(),
+  passengers: Joi.number().integer().min(1).max(60).required(),
+  notes: Joi.string().allow("").optional(),
+});
+
+export const scheduleSchema = Joi.object({
+  driver_id: Joi.number().integer().required(),
+  vehicle_id: Joi.number().integer().required(),
+  scheduled_time: Joi.date().iso().required(),
+});
+
+// ===============================================
+// 🔹 Create Service Request (Public)
+// ===============================================
 export async function createRequest(req, res) {
-  const { error, value } = createSchema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const errors = Object.fromEntries(error.details.map(d => [d.context.key, d.message]));
-    return res.status(400).json(makeError('Validation failed', errors));
+  try {
+    const { error, value } = requestSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      const errors = Object.fromEntries(error.details.map((d) => [d.context.key, d.message]));
+      return res.status(400).json(makeError("Validation failed", errors));
+    }
+
+    const [id] = await db("service_requests").insert({
+      ...value,
+      status: "pending",
+    });
+
+    const request = await db("service_requests").where({ id }).first();
+    res.status(201).json({ message: "Request created successfully", request });
+  } catch (err) {
+    console.error("Error creating request:", err);
+    res.status(500).json(makeError("Failed to create service request"));
   }
-  const [id] = await db('service_requests').insert(value);
-  const row = await db('service_requests').where({ id }).first();
-  res.status(201).json(row);
 }
 
-export async function listRequests(req, res) {
-  const { page = 1, size = 10, q = '', status } = req.query;
-  const base = db('service_requests').modify(qb => {
-    if (q) qb.whereILike('customer_name', `%${q}%`).orWhereILike('phone', `%${q}%`);
-    if (status) qb.andWhere('status', status);
-  });
-  const items = await base.clone().orderBy('created_at', 'desc').limit(size).offset((page - 1) * size);
-  const [{ count }] = await base.clone().count({ count: '*' });
-  res.json({ items, total: Number(count) });
+// ===============================================
+// 🔹 List All Requests (Viewer + Coordinator)
+// ===============================================
+export async function getAllRequests(req, res) {
+  try {
+    const { status } = req.query;
+
+    let query = db("service_requests as r")
+      .leftJoin("assignments as a", "r.id", "a.request_id")
+      .leftJoin("drivers as d", "a.driver_id", "d.id")
+      .leftJoin("vehicles as v", "a.vehicle_id", "v.id")
+      .select(
+        "r.id",
+        "r.customer_name",
+        "r.phone",
+        "r.pickup_location",
+        "r.dropoff_location",
+        "r.pickup_time",
+        "r.passengers",
+        "r.notes",
+        "r.status",
+        "d.name as driver_name",
+        "v.plate as vehicle_plate",
+        "a.scheduled_time"
+      )
+      .orderBy("r.id", "desc");
+
+    if (status) query = query.where("r.status", status);
+
+    const rows = await query;
+
+    const items = rows.map((r) => ({
+      id: r.id,
+      customer_name: r.customer_name,
+      phone: r.phone,
+      pickup_location: r.pickup_location,
+      dropoff_location: r.dropoff_location,
+      pickup_time: r.pickup_time,
+      passengers: r.passengers,
+      notes: r.notes,
+      status: r.status,
+      assignment: r.driver_name
+        ? {
+            driver_name: r.driver_name,
+            vehicle_plate: r.vehicle_plate,
+            scheduled_time: r.scheduled_time,
+          }
+        : null,
+    }));
+
+    res.json({ items });
+  } catch (err) {
+    console.error("Error fetching service requests:", err);
+    res.status(500).json(makeError("Failed to load service requests"));
+  }
 }
 
+// ===============================================
+// 🔹 Get Single Request (Viewer + Coordinator)
+// ===============================================
 export async function getRequest(req, res) {
-  const row = await db('service_requests').where({ id: req.params.id }).first();
-  if (!row) return res.status(404).json({ message: 'Not found' });
-  const assignment = await db('assignments').where({ request_id: row.id }).first();
-  res.json({ ...row, assignment });
-}
+  try {
+    const { id } = req.params;
+    const r = await db("service_requests as r")
+      .leftJoin("assignments as a", "r.id", "a.request_id")
+      .leftJoin("drivers as d", "a.driver_id", "d.id")
+      .leftJoin("vehicles as v", "a.vehicle_id", "v.id")
+      .select(
+        "r.*",
+        "d.name as driver_name",
+        "v.plate as vehicle_plate",
+        "a.scheduled_time"
+      )
+      .where("r.id", id)
+      .first();
 
-export async function updateStatus(req, res) {
-  const { error, value } = updateStatusSchema.validate(req.body);
-  if (error) return res.status(400).json(makeError('Validation failed', { status: error.message }));
-  const exists = await db('service_requests').where({ id: req.params.id }).first();
-  if (!exists) return res.status(404).json({ message: 'Not found' });
-  await db('service_requests').where({ id: req.params.id }).update({ status: value.status });
-  const row = await db('service_requests').where({ id: req.params.id }).first();
-  res.json(row);
-}
+    if (!r) return res.status(404).json(makeError("Request not found"));
 
-export async function schedule(req, res) {
-  const { error, value } = scheduleSchema.validate(req.body, { abortEarly: false });
-  if (error) {
-    const errors = Object.fromEntries(error.details.map(d => [d.context.key, d.message]));
-    return res.status(400).json(makeError('Validation failed', errors));
+    res.json({
+      ...r,
+      assignment: r.driver_name
+        ? {
+            driver_name: r.driver_name,
+            vehicle_plate: r.vehicle_plate,
+            scheduled_time: r.scheduled_time,
+          }
+        : null,
+    });
+  } catch (err) {
+    console.error("Error getting request:", err);
+    res.status(500).json(makeError("Failed to get service request"));
   }
-  const exists = await db('service_requests').where({ id: req.params.id }).first();
-  if (!exists) return res.status(404).json({ message: 'Not found' });
-  await db('service_requests').where({ id: req.params.id }).update({ status: 'scheduled' });
-  const [assignmentId] = await db('assignments').insert({ request_id: req.params.id, ...value });
-  const assignment = await db('assignments').where({ id: assignmentId }).first();
-  res.json({ ...exists, status: 'scheduled', assignment });
 }
 
+// ===============================================
+// 🔹 Update Status (Coordinator)
+// ===============================================
+export async function updateStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!["approved", "rejected", "pending"].includes(status)) {
+      return res.status(400).json(makeError("Invalid status"));
+    }
+
+    const exists = await db("service_requests").where({ id }).first();
+    if (!exists) return res.status(404).json(makeError("Request not found"));
+
+    await db("service_requests").where({ id }).update({ status });
+    res.json({ message: `Request ${id} updated to ${status}` });
+  } catch (err) {
+    console.error("Error updating status:", err);
+    res.status(500).json(makeError("Failed to update status"));
+  }
+}
+
+// ===============================================
+// 🔹 Schedule Request (Coordinator)
+// ===============================================
+export async function schedule(req, res) {
+  try {
+    const { error, value } = scheduleSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      const errors = Object.fromEntries(error.details.map((d) => [d.context.key, d.message]));
+      return res.status(400).json(makeError("Validation failed", errors));
+    }
+
+    const request = await db("service_requests").where({ id: req.params.id }).first();
+    if (!request) return res.status(404).json(makeError("Service request not found"));
+
+    await db("service_requests").where({ id: req.params.id }).update({ status: "scheduled" });
+
+    const [assignmentId] = await db("assignments").insert({
+      request_id: req.params.id,
+      ...value,
+    });
+
+    const assignment = await db("assignments").where({ id: assignmentId }).first();
+
+    res.json({
+      ...request,
+      status: "scheduled",
+      assignment,
+      message: "Request scheduled successfully",
+    });
+  } catch (err) {
+    console.error("Error scheduling request:", err);
+    res.status(500).json(makeError("Failed to schedule request"));
+  }
+}
+
+// ===============================================
+// 🔹 Delete Request (Coordinator)
+// ===============================================
 export async function remove(req, res) {
-  const deleted = await db('service_requests').where({ id: req.params.id }).del();
-  if (!deleted) return res.status(404).json({ message: 'Not found' });
-  res.status(204).end();
+  try {
+    const { id } = req.params;
+    await db("assignments").where({ request_id: id }).del();
+    const deleted = await db("service_requests").where({ id }).del();
+    if (!deleted) return res.status(404).json(makeError("Request not found"));
+    res.json({ message: "Request deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting request:", err);
+    res.status(500).json(makeError("Failed to delete request"));
+  }
 }
 
-export async function listDrivers(_req, res) { res.json(await db('drivers').orderBy('name')); }
-export async function listVehicles(_req, res) { res.json(await db('vehicles').orderBy('plate')); }
+// ===============================================
+// 🔹 List Drivers (Viewer + Coordinator)
+// ===============================================
+export async function listDrivers(req, res) {
+  try {
+    const drivers = await db("drivers").select("*").orderBy("id");
+    res.json(drivers);
+  } catch (err) {
+    console.error("Error listing drivers:", err);
+    res.status(500).json(makeError("Failed to list drivers"));
+  }
+}
 
-export async function dailyAnalytics(_req, res) {
-  const rows = await db('service_requests')
-    .select(db.raw('DATE(created_at) AS day'))
-    .count({ count: '*' })
-    .groupBy('day')
-    .orderBy('day', 'desc')
-    .limit(7);
-  res.json(rows.reverse());
+// ===============================================
+// 🔹 List Vehicles (Viewer + Coordinator)
+// ===============================================
+export async function listVehicles(req, res) {
+  try {
+    const vehicles = await db("vehicles").select("*").orderBy("id");
+    res.json(vehicles);
+  } catch (err) {
+    console.error("Error listing vehicles:", err);
+    res.status(500).json(makeError("Failed to list vehicles"));
+  }
+}
+
+// ===============================================
+// 🔹 Daily Analytics (Viewer + Coordinator)
+// ===============================================
+export async function dailyAnalytics(req, res) {
+  try {
+    const rows = await db("service_requests")
+      .select(
+        db.raw("DATE(pickup_time) as date"),
+        db.raw("COUNT(*) as total_requests"),
+        db.raw(
+          "SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved"
+        ),
+        db.raw(
+          "SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected"
+        ),
+        db.raw(
+          "SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled"
+        )
+      )
+      .groupBy("date")
+      .orderBy("date", "desc")
+      .limit(7);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("Error loading analytics:", err);
+    res.status(500).json(makeError("Failed to load analytics"));
+  }
+}
+export async function deleteRequest(req, res) {
+  try {
+    const { id } = req.params;
+    await db("assignments").where({ request_id: id }).del();
+    const deleted = await db("service_requests").where({ id }).del();
+    if (!deleted) return res.status(404).json(makeError("Request not found"));
+    res.json({ message: "Request deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting request:", err);
+    res.status(500).json(makeError("Failed to delete request"));
+  }
 }

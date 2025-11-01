@@ -1,0 +1,406 @@
+{
+	"info": {
+		"_postman_id": "76157521-bec6-4389-becd-d2b26f0bc152",
+		"name": "CoachRequestApp",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "43246155"
+	},
+	"item": [
+		{
+			"name": "Login-Viewer",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"viewer@example.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:4000/api/auth/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login - Coordinator",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"email\": \"coord@example.com\",\r\n  \"password\": \"password123\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:4000/api/auth/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create New Request (Public)",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"customer_name\": \"Azmath\",\r\n  \"phone\": \"0771234567\",\r\n  \"pickup_location\": \"Colombo\",\r\n  \"dropoff_location\": \"Kandy\",\r\n  \"pickup_time\": \"2025-11-08T08:00:00\",\r\n  \"passengers\": 4,\r\n  \"notes\": \"Early morning trip\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:4000/api/service-requests",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"service-requests"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Requests (Viewer / Coordinator)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:4000/api/service-requests",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"service-requests"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Single Request by ID",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:4000/api/service-requests/10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"service-requests",
+						"10"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Approve Request (Coordinator Only)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \"status\": \"approved\" }\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:4000/api/service-requests/14/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"service-requests",
+						"14",
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Reject Request (Coordinator Only)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{ \"status\": \"rejected\" }\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:4000/api/service-requests/12/status",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"service-requests",
+						"12",
+						"status"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Schedule Trip (Coordinator Only)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"driver_id\": 1,\r\n  \"vehicle_id\": 2,\r\n  \"scheduled_time\": \"2025-11-08T07:30:00\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:4000/api/service-requests/14/schedule",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"service-requests",
+						"14",
+						"schedule"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List All Drivers (Viewer / Coordinator)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:4000/api/drivers",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"drivers"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List All Vehicles (Viewer / Coordinator)",
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MiwiZW1haWwiOiJjb29yZEBleGFtcGxlLmNvbSIsInJvbGUiOiJjb29yZGluYXRvciIsImlhdCI6MTc2MjAwODA1MSwiZXhwIjoxNzYyMDM2ODUxfQ.wvgpOP6VAmSW-zKekU2OZQocQKRIj8POQPpMrqgbDSA",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:4000/api/vehicles",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "4000",
+					"path": [
+						"api",
+						"vehicles"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

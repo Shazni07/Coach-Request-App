@@ -124,7 +124,7 @@ The application will be available at:
 
 ### Viewer Login
 - Email: viewer@example.com
-- Password: viewer123
+- Password: password123
 
 ## 📱 Features in Detail
 
@@ -214,6 +214,9 @@ The application will be available at:
 4. Push to the branch
 5. Open a pull request
 
-## 📝 License
+## 👨‍💻 Developer
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Name: Azmath Shazni
+Email: azmathshazni.mi@gmail.com
+Role: Software Engineering Undergraduate @ SLIIT
+Project Type: Internship Assessment — Coach Request System

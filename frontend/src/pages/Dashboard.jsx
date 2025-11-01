@@ -7,11 +7,13 @@ import {
   LogOut,
   Loader2,
   Users,
+  BarChart as ChartIcon,
 } from "lucide-react";
 import Modal from "../components/Modal";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
   const [items, setItems] = useState([]);
@@ -20,12 +22,16 @@ export default function Dashboard() {
   const [vehicles, setVehicles] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [schedule, setSchedule] = useState({
     driver_id: "",
     vehicle_id: "",
     scheduled_time: "",
   });
+  const [requestToDelete, setRequestToDelete] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState([]);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const { role, logout } = useAuth();
   const navigate = useNavigate();
@@ -41,9 +47,10 @@ export default function Dashboard() {
       const res = await api.authed(`/service-requests?status=${status}`);
       const data = await res.json();
       setItems(data.items || []);
-      if (role === "coordinator") {
+      if (role === "coordinator" || role === "viewer") {
         fetchDrivers();
         fetchVehicles();
+        fetchAnalytics();
       }
     } catch {
       toast.error("Failed to load requests.");
@@ -60,6 +67,21 @@ export default function Dashboard() {
   async function fetchVehicles() {
     const res = await api.authed(`/vehicles`);
     setVehicles(await res.json());
+  }
+
+  async function fetchAnalytics() {
+    try {
+      const res = await api.authed('/analytics/daily');
+      const data = await res.json();
+      // Format dates for display
+      const formattedData = data.map(item => ({
+        ...item,
+        date: new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' }),
+      }));
+      setAnalyticsData(formattedData);
+    } catch (error) {
+      toast.error('Failed to load analytics');
+    }
   }
 
   async function changeStatus(id, newStatus) {
@@ -88,6 +110,20 @@ export default function Dashboard() {
       load();
     } catch {
       toast.error("Failed to schedule trip.");
+    }
+  }
+
+  async function handleDelete(id) {
+    try {
+      await api.authed(`/service-requests/${id}`, {
+        method: "DELETE",
+      });
+      toast.success("Request deleted successfully!");
+      setRequestToDelete(null);
+      setShowDeleteModal(false);
+      load();
+    } catch {
+      toast.error("Failed to delete request.");
     }
   }
 
@@ -126,20 +162,29 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-3 mb-4">
-        <label className="text-sm text-gray-600">Filter by status:</label>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="border px-3 py-2 rounded-md"
+      {/* Filter and Analytics */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <label className="text-sm text-gray-600">Filter by status:</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="border px-3 py-2 rounded-md"
+          >
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="scheduled">Scheduled</option>
+          </select>
+        </div>
+        
+        <button
+          onClick={() => setShowAnalytics(true)}
+          className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-md text-sm transition"
         >
-          <option value="">All</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="scheduled">Scheduled</option>
-        </select>
+          <ChartIcon size={16} /> View Analytics
+        </button>
       </div>
 
       {/* Table */}
@@ -208,35 +253,46 @@ export default function Dashboard() {
 
                   {/* Coordinator Actions */}
                   {role === "coordinator" && (
-                    <td className="p-2 flex gap-2 justify-center">
-                      {r.status === "pending" && (
-                        <>
-                          <button
-                            onClick={() => changeStatus(r.id, "approved")}
-                            className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700"
-                          >
-                            <CheckCircle2 size={14} /> Approve
-                          </button>
-                          <button
-                            onClick={() => changeStatus(r.id, "rejected")}
-                            className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded-md text-xs hover:bg-red-700"
-                          >
-                            <XCircle size={14} /> Reject
-                          </button>
-                        </>
-                      )}
+                    <td className="p-2">
+                      <div className="flex flex-col gap-2 items-center">
+                        {r.status === "pending" && (
+                          <>
+                            <button
+                              onClick={() => changeStatus(r.id, "approved")}
+                              className="flex items-center gap-1 px-2 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700 w-full"
+                            >
+                              <CheckCircle2 size={14} /> Approve
+                            </button>
+                            <button
+                              onClick={() => changeStatus(r.id, "rejected")}
+                              className="flex items-center gap-1 px-2 py-1 bg-red-600 text-white rounded-md text-xs hover:bg-red-700 w-full"
+                            >
+                              <XCircle size={14} /> Reject
+                            </button>
+                          </>
+                        )}
 
-                      {r.status === "approved" && (
+                        {r.status === "approved" && (
+                          <button
+                            onClick={() => {
+                              setSelected(r);
+                              setShowModal(true);
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded-md text-xs hover:bg-blue-700 w-full"
+                          >
+                            <CalendarClock size={14} /> Schedule
+                          </button>
+                        )}
                         <button
                           onClick={() => {
-                            setSelected(r);
-                            setShowModal(true);
+                            setRequestToDelete(r);
+                            setShowDeleteModal(true);
                           }}
-                          className="flex items-center gap-1 px-2 py-1 bg-blue-600 text-white rounded-md text-xs hover:bg-blue-700"
+                          className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded-md text-xs hover:bg-gray-700 w-full"
                         >
-                          <CalendarClock size={14} /> Schedule
+                          <XCircle size={14} /> Delete
                         </button>
-                      )}
+                      </div>
                     </td>
                   )}
                 </tr>
@@ -248,73 +304,224 @@ export default function Dashboard() {
 
       {/* Schedule Modal (Only for Coordinators) */}
       {role === "coordinator" && (
-        <Modal
-          open={showModal}
-          title={`Schedule Request #${selected?.id}`}
-          onClose={() => setShowModal(false)}
-        >
-          <form onSubmit={handleScheduleSubmit} className="flex flex-col gap-3">
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Driver</label>
-              <select
-                value={schedule.driver_id}
-                onChange={(e) =>
-                  setSchedule({ ...schedule, driver_id: e.target.value })
-                }
-                required
-                className="w-full border rounded-md px-3 py-2"
+        <>
+          <Modal
+            open={showModal}
+            title={`Schedule Request #${selected?.id}`}
+            onClose={() => setShowModal(false)}
+          >
+            <form onSubmit={handleScheduleSubmit} className="flex flex-col gap-3">
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Driver</label>
+                <select
+                  value={schedule.driver_id}
+                  onChange={(e) =>
+                    setSchedule({ ...schedule, driver_id: e.target.value })
+                  }
+                  required
+                  className="w-full border rounded-md px-3 py-2"
+                >
+                  <option value="">Select driver</option>
+                  {drivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">Vehicle</label>
+                <select
+                  value={schedule.vehicle_id}
+                  onChange={(e) =>
+                    setSchedule({ ...schedule, vehicle_id: e.target.value })
+                  }
+                  required
+                  className="w-full border rounded-md px-3 py-2"
+                >
+                  <option value="">Select vehicle</option>
+                  {vehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.plate} (capacity: {v.capacity})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-700 mb-1">
+                  Schedule Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={schedule.scheduled_time}
+                  onChange={(e) =>
+                    setSchedule({ ...schedule, scheduled_time: e.target.value })
+                  }
+                  required
+                  className="w-full border rounded-md px-3 py-2"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="mt-2 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
               >
-                <option value="">Select driver</option>
-                {drivers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+                Confirm Schedule
+              </button>
+            </form>
+          </Modal>
 
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Vehicle</label>
-              <select
-                value={schedule.vehicle_id}
-                onChange={(e) =>
-                  setSchedule({ ...schedule, vehicle_id: e.target.value })
-                }
-                required
-                className="w-full border rounded-md px-3 py-2"
-              >
-                <option value="">Select vehicle</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.plate} (capacity: {v.capacity})
-                  </option>
-                ))}
-              </select>
+          {/* Delete Confirmation Modal */}
+          <Modal
+            open={showDeleteModal}
+            title="Delete Request"
+            onClose={() => {
+              setShowDeleteModal(false);
+              setRequestToDelete(null);
+            }}
+          >
+            <div className="flex flex-col gap-4">
+              <p className="text-gray-600">
+                Are you sure you want to delete request #{requestToDelete?.id} for{" "}
+                {requestToDelete?.customer_name}? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setRequestToDelete(null);
+                  }}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md text-sm transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(requestToDelete?.id)}
+                  className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md text-sm transition"
+                >
+                  Delete Request
+                </button>
+              </div>
             </div>
+          </Modal>
 
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">
-                Schedule Time
-              </label>
-              <input
-                type="datetime-local"
-                value={schedule.scheduled_time}
-                onChange={(e) =>
-                  setSchedule({ ...schedule, scheduled_time: e.target.value })
-                }
-                required
-                className="w-full border rounded-md px-3 py-2"
-              />
+          {/* Analytics Modal */}
+          <Modal
+            open={showAnalytics}
+            title="Weekly Request Analytics"
+            onClose={() => setShowAnalytics(false)}
+          >
+            <div className="flex flex-col gap-4">
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData}>
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="total_requests" fill="#3b82f6" name="Total Requests" />
+                    <Bar dataKey="approved" fill="#22c55e" name="Approved" />
+                    <Bar dataKey="scheduled" fill="#0ea5e9" name="Scheduled" />
+                    <Bar dataKey="rejected" fill="#ef4444" name="Rejected" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Analytics Summary */}
+              <div className="space-y-6">
+                {analyticsData.length > 0 && (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <h3 className="text-blue-700 font-medium text-sm">Total Requests</h3>
+                        <p className="text-2xl font-bold text-blue-800">
+                          {analyticsData.reduce((sum, day) => sum + day.total_requests, 0)}
+                        </p>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <h3 className="text-green-700 font-medium text-sm">Approval Rate</h3>
+                        <p className="text-2xl font-bold text-green-800">
+                          {Math.round(
+                            (analyticsData.reduce((sum, day) => sum + day.approved, 0) /
+                              analyticsData.reduce((sum, day) => sum + day.total_requests, 0)) *
+                              100
+                          )}
+                          %
+                        </p>
+                      </div>
+                      <div className="bg-sky-50 p-4 rounded-lg">
+                        <h3 className="text-sky-700 font-medium text-sm">Schedule Rate</h3>
+                        <p className="text-2xl font-bold text-sky-800">
+                          {Math.round(
+                            (analyticsData.reduce((sum, day) => sum + day.scheduled, 0) /
+                              analyticsData.reduce((sum, day) => sum + day.approved, 0)) *
+                              100
+                          )}
+                          %
+                        </p>
+                      </div>
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <h3 className="text-purple-700 font-medium text-sm">Daily Average</h3>
+                        <p className="text-2xl font-bold text-purple-800">
+                          {Math.round(
+                            analyticsData.reduce((sum, day) => sum + day.total_requests, 0) /
+                              analyticsData.length
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Trends Analysis */}
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h3 className="text-gray-700 font-medium mb-3">Quick Insights</h3>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        {/* Busiest Day */}
+                        <p className="flex justify-between">
+                          <span>Busiest Day:</span>
+                          <span className="font-medium">{
+                            analyticsData.reduce((max, day) => 
+                              day.total_requests > max.total_requests ? day : max
+                            ).date
+                          } ({
+                            analyticsData.reduce((max, day) => 
+                              day.total_requests > max.total_requests ? day : max
+                            ).total_requests
+                          } requests)</span>
+                        </p>
+
+                        {/* Processing Efficiency */}
+                        <p className="flex justify-between">
+                          <span>Processing Efficiency:</span>
+                          <span className="font-medium">{
+                            Math.round(
+                              (analyticsData.reduce((sum, day) => sum + day.scheduled + day.rejected, 0) /
+                                analyticsData.reduce((sum, day) => sum + day.total_requests, 0)) *
+                                100
+                            )}% requests processed</span>
+                        </p>
+
+                        {/* Weekly Trend */}
+                        <p className="flex justify-between">
+                          <span>Weekly Trend:</span>
+                          <span className={`font-medium ${
+                            analyticsData[analyticsData.length - 1]?.total_requests > analyticsData[0]?.total_requests
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}>
+                            {analyticsData[analyticsData.length - 1]?.total_requests > analyticsData[0]?.total_requests
+                              ? '↗ Increasing'
+                              : '↘ Decreasing'}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-
-            <button
-              type="submit"
-              className="mt-2 bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition"
-            >
-              Confirm Schedule
-            </button>
-          </form>
-        </Modal>
+          </Modal>
+        </>
       )}
     </div>
   );

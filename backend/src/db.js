@@ -1,3 +1,7 @@
 import knex from 'knex';
 import knexfile from '../knexfile.cjs';
-export const db = knex(knexfile);
+
+const db = knex(knexfile);
+
+export { db };
+export default db;

@@ -1,6 +1,6 @@
-import db from "../db/db.js";
+import db from "../db.js";
 import Joi from "joi";
-import { makeError } from "../utils/errors.js";
+//import { makeError } from "../utils/errors.js";
 
 // ===============================================
 // 🔹 Validation Schemas
